@@ -176,14 +176,46 @@ const addEmail = async (req, res) => {
                 success: false
             })
         }
-        // Create a token with userId + email, expires in 15 minutes
-        const token = jwt.sign({ userId, email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-        const verificationLink = `${process.env.CLIENT_URL}/verify-email/${token}`;
+        const now = new Date();
+        const oneHour = 60 * 60 * 1000;
+        if (
+            user.emailVerification &&
+            user.emailVerification.firstAttemptAt &&
+            now - user.emailVerification.firstAttemptAt > oneHour
+        ) {
+            user.emailVerification.attempts = 0;
+            user.emailVerification.firstAttemptAt = now;
+        }
+        // Check if too many attempts
+        if (user.emailVerification?.attempts >= 5) {
+            return res.status(429).json({
+                message: "Too many attempts. Try again after one hour.",
+                success: false,
+            });
+        }
+        // 4-digit code generation
+        const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+        // Store code and expiry (15 min)
+        user.emailVerification = {
+            code: verificationCode,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+            attempts: (user.emailVerification?.attempts || 0) + 1,
+            firstAttemptAt: user.emailVerification?.firstAttemptAt || now,
+        };
+        user.unverifyEmail = email; // Temporarily set email (unverified)
+        await user.save();
         const html = `
-    <h3>Hi ${user.username || "User"},</h3>
-    <p>Please click below to confirm your new email address:</p>
-    <a href="${verificationLink}">Verify Email</a>
-  `;
+        <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; color: #000; background-color: #fff; border: 1px solid #ddd; border-radius: 8px;">
+          <h2 style="text-align: center; color: #000;">Email Verification</h2>
+          <p>Hi <strong>${user.username}</strong>,</p>
+          <p>We received a request to verify your email address. Please use the verification code below:</p>
+          <div style="font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; padding: 10px; border: 1px dashed #000; background-color: #f9f9f9;">
+            ${verificationCode}
+          </div>
+          <p>This code is valid for <strong>15 minutes</strong>. If you didn't request this, you can safely ignore this message.</p>
+          <p>Thanks,<br/>The Blog App Team</p>
+        </div>
+      `;
         const sent = await sendEmail(email, "Verify Your Email", html);
         if (!sent) {
             return res.status(500).json({ message: "Failed to send email", success: false });
@@ -196,25 +228,69 @@ const addEmail = async (req, res) => {
         res.status(500).json({ message: "Server error", success: false });
     }
 }
-//verify email
-const verifyEmail = async (req, res) => {
+const cancelAddEmail = async (req, res) => {
     try {
-        const { token } = req.params;
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const { userId, email } = decoded;
-        const emailTaken = await User.findOne({ email });
-        if (emailTaken) {
-            return res.status(409).json({ message: "Email already used", success: false });
-        }
-        const user = await User.findById(userId);
+        const userId = req.params.id;
+        const user = await User.findById(userId)
         if (!user) {
-            return res.status(404).json({ message: "User not found", success: false });
+            return res.status(404).json({
+                message: "User Not found",
+                success: false
+            })
         }
-        user.email = email;
+        user.emailVerification = undefined;
+        user.unverifyEmail = undefined;
         await user.save();
-        res.status(200).json({ message: "Email verified and added successfully", success: true });
+        return res.status(200).json({
+            message: "Request Cancel Successfully",
+            success: true
+        })
     } catch (error) {
-        res.status(400).json({ message: "Invalid or expired token", success: false });
+        res.status(500).json({
+            message: 'server error',
+            success: false
+        })
+    }
+}
+//verify email
+const verifyEmailCode = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { code } = req.body;
+        const user = await User.findById(userId);
+        if (!user || !user.emailVerification) {
+            return res.status(400).json({ message: "Invalid request", success: false });
+        }
+        const { code: savedCode, expiresAt } = user.emailVerification;
+        if (Date.now() > new Date(expiresAt)) {
+            return res.status(410).json({ message: "Verification code expired", success: false });
+        }
+        if (code !== savedCode) {
+            user.emailVerification.attempts += 1;
+            await user.save();
+            return res.status(401).json({ message: "Incorrect code", success: false });
+        }
+        // Clear verification fields
+        user.email = user.unverifyEmail;
+        user.emailVerification = undefined;
+        user.unverifyEmail = undefined;
+        await user.save();
+        const html = `
+  <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; color: #000; background-color: #fff; border: 1px solid #ddd; border-radius: 8px;">
+    <h2 style="text-align: center; color: #000;">Email Successfully Added</h2>
+    <p>Hi <strong>${user.username}</strong>,</p>
+    <p>Your new email address <strong>${user.email}</strong> has been successfully added to your Blog App account.</p>
+    <p>If you didn't make this change or believe this was done in error, please contact our support team immediately.</p>
+    <p>Thank you,<br/>The Blog App Team</p>
+  </div>
+`;
+        const sent = await sendEmail(user.email, "Email Verified Successfully", html);
+        if (!sent) {
+            return res.status(500).json({ message: "Email send failed", success: false });
+        }
+        res.status(200).json({ message: "Email verified successfully", success: true });
+    } catch (error) {
+        res.status(500).json({ message: `${error}`, success: false });
     }
 }
 const changeEmail = async (req, res) => {
@@ -227,7 +303,7 @@ const changeEmail = async (req, res) => {
                 success: false
             })
         }
-        const existedEmail = await User.findOne({ email:newEmail })
+        const existedEmail = await User.findOne({ email: newEmail })
         if (existedEmail) {
             return res.status(401).json({
                 message: "Email already exist",
@@ -241,14 +317,46 @@ const changeEmail = async (req, res) => {
                 success: false
             })
         }
-        // Create a token with userId + email, expires in 15 minutes
-        const token = jwt.sign({ userId, newEmail }, process.env.JWT_SECRET, { expiresIn: "15m" });
-        const verificationLink = `${process.env.CLIENT_URL}/verify-email/${token}`;
+        const now = new Date();
+        const oneHour = 60 * 60 * 1000;
+        if (
+            user.emailVerification &&
+            user.emailVerification.firstAttemptAt &&
+            now - user.emailVerification.firstAttemptAt > oneHour
+        ) {
+            user.emailVerification.attempts = 0;
+            user.emailVerification.firstAttemptAt = now;
+        }
+        // Check if too many attempts
+        if (user.emailVerification?.attempts >= 5) {
+            return res.status(429).json({
+                message: "Too many attempts. Try again after one hour.",
+                success: false,
+            });
+        }
+        // 4-digit code generation
+        const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+        // Store code and expiry (15 min)
+        user.emailVerification = {
+            code: verificationCode,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+            attempts: (user.emailVerification?.attempts || 0) + 1,
+            firstAttemptAt: user.emailVerification?.firstAttemptAt || now,
+        };
+        user.unverifyEmail = newEmail; // Temporarily set email (unverified)
+        await user.save();
         const html = `
-    <h3>Hi ${user.username || "User"},</h3>
-    <p>Please click below to confirm your new email address:</p>
-    <a href="${verificationLink}">Verify Email</a>
-  `;
+        <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; color: #000; background-color: #fff; border: 1px solid #ddd; border-radius: 8px;">
+          <h2 style="text-align: center; color: #000;">Email Verification</h2>
+          <p>Hi <strong>${user.username}</strong>,</p>
+          <p>We received a request to verify your email address. Please use the verification code below:</p>
+          <div style="font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; padding: 10px; border: 1px dashed #000; background-color: #f9f9f9;">
+            ${verificationCode}
+          </div>
+          <p>This code is valid for <strong>15 minutes</strong>. If you didn't request this, you can safely ignore this message.</p>
+          <p>Thanks,<br/>The Blog App Team</p>
+        </div>
+      `;
         const sent = await sendEmail(newEmail, "Verify Your New Email", html);
         if (!sent) {
             return res.status(500).json({ message: "Failed to send email", success: false });
@@ -263,6 +371,106 @@ const changeEmail = async (req, res) => {
 }
 //forget password
 const forgetPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            res.status(401).json({
+                message: "Please enter email",
+                success: false
+            })
+        }
+        const user = await User.findOne({ email })
+        if (!user) {
+            res.status(404).json({
+                message: "User not found",
+                success: false
+            })
+        }
+        // Rate limit: max 5 attempts/hour
+        const now = Date.now();
+        const lastAttempt = user.resetPassword?.lastAttemptAt?.getTime() || 0;
 
+        if (now - lastAttempt < 60 * 60 * 1000 && user.resetPassword?.attempts >= 5) {
+            return res.status(429).json({
+                message: "Too many reset attempts. Try again in 1 hour.",
+                success: false,
+            });
+        }
+        // Generate code
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        user.resetPassword = {
+            code,
+            expiresAt: new Date(now + 15 * 60 * 1000),
+            attempts: (lastAttempt && now - lastAttempt < 60 * 60 * 1000)
+                ? user.resetPassword.attempts + 1
+                : 1,
+            lastAttemptAt: new Date(),
+        };
+        await user.save();
+        const html = `
+        <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; color: #000; background-color: #fff; border: 1px solid #ddd; border-radius: 8px;">
+          <h2 style="text-align: center; color: #000;">Password Reset Request</h2>
+          <p>Hi <strong>${user.username}</strong>,</p>
+          <p>We received a request to reset your password for your Blog App account. Please use the verification code below to proceed:</p>
+          <div style="font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; padding: 10px; border: 1px dashed #000; background-color: #f9f9f9;">
+            ${code}
+          </div>
+          <p>This code will expire in <strong>15 minutes</strong>. If you didn’t request a password reset, you can safely ignore this email.</p>
+          <p>Stay secure,<br/>The Blog App Team</p>
+        </div>
+      `;
+        const sent = await sendEmail(email, "Password Reset Code", html);
+        if (!sent) {
+            return res.status(500).json({ message: "Email send failed", success: false });
+        }
+        res.status(200).json({ message: "Reset code sent to email", success: true });
+    } catch (error) {
+        res.status(500).json({
+            message: `Error : ${error}`,
+            success: false
+        })
+    }
 }
-export { createUser, loginUser, logout, getMyProfile, changePassword, addEmail, verifyEmail, changeEmail }
+
+const verifyForgetPassword = async (req, res) => {
+    try {
+        const { email, code, newPassword } = req.body;
+        if (!email || !code || !newPassword) {
+            return res.status(400).json({ message: "All fields required", success: false });
+        }
+        const user = await User.findOne({ email });
+        if (!user || !user.resetPassword?.code) {
+            return res.status(400).json({ message: "Invalid request", success: false });
+        }
+        if (user.resetPassword.code !== code) {
+            return res.status(401).json({ message: "Incorrect code", success: false });
+        }
+        if (user.resetPassword.expiresAt < new Date()) {
+            return res.status(410).json({ message: "Code expired", success: false });
+        }
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        // Clear reset code
+        user.resetPassword = undefined;
+        await user.save();
+        const html = `
+  <div style="max-width: 500px; margin: auto; padding: 20px; font-family: Arial, sans-serif; color: #000; background-color: #fff; border: 1px solid #ddd; border-radius: 8px;">
+    <h2 style="text-align: center; color: #000;">Password Changed Successfully</h2>
+    <p>Hi <strong>${user.username}</strong>,</p>
+    <p>Your password was successfully changed on your Blog App account.</p>
+    <p>If you didn’t request this change, we strongly recommend resetting your password immediately or contacting our support team.</p>
+    <p>Stay secure,<br/>The Blog App Team</p>
+  </div>
+`;
+        const sent = await sendEmail(email, "Password Reset Successfully", html);
+        if (!sent) {
+            return res.status(500).json({ message: "Email send failed", success: false });
+        }
+        res.status(200).json({ message: "Password reset successful", success: true });
+    } catch (err) {
+        console.error("Reset Password Error:", err);
+        res.status(500).json({ message: "Server error", success: false });
+    }
+};
+
+export { createUser, loginUser, logout, getMyProfile, changePassword, forgetPassword, verifyForgetPassword, addEmail, verifyEmailCode, changeEmail, cancelAddEmail }

@@ -13,10 +13,26 @@ const userSchema =  new mongoose.Schema({
     password:{
         type:String,
         required:true
-    },email:{
+    },
+    resetPassword: {
+        code: String,
+        expiresAt: Date,
+        attempts: { type: Number, default: 0 },
+        lastAttemptAt: Date,
+      },
+    email:{
         type:String,
         unique:true
-    }
+    },
+    emailVerification: {
+        code: String,
+        expiresAt: Date,
+        attempts: { type: Number, default: 0 },
+        firstAttemptAt: Date,
+      },
+      unverifyEmail:{
+        type:String
+      }
 })
 
 export const User=mongoose.model('User',userSchema)
