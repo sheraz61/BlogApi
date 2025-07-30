@@ -2,7 +2,7 @@ import { User } from "../models/user.model.js";
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { sendEmail } from '../utils/sendEmail.js'
-
+import cloudinary from '../config/cloudinary.js'
 //register user
 const registerUser = async (req, res) => {
     try {
@@ -97,6 +97,93 @@ const logout = async (req, res) => {
         res.status(500).json({ message: error.message, success: false });
     }
 }
+//Upload profile image
+const uploadProfileImage = async (req, res) => {
+    try {
+      const userId = req.user; // From isAuth middleware
+      if (!req.file || !req.file.path) {
+        return res.status(400).json({ success: false, message: 'Image is required' });
+      }
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      // Delete previous image from Cloudinary if it exists
+      if (user.profileImage?.public_id) {
+        await cloudinary.uploader.destroy(user.profileImage.public_id);
+      }
+      // Save new image details
+      user.profileImage = {
+        url: req.file.path,
+        public_id: req.file.filename,
+      };
+      await user.save();
+      return res.status(200).json({
+        success: true,
+        message: "Profile image uploaded successfully",
+        profileImage: user.profileImage,
+      });
+    } catch (error) {
+      console.error('Upload Image Error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  };
+  //update profile image
+  const updateProfileImage = async (req, res) => {
+    try {
+      const userId = req.user; // From isAuth middleware
+      if (!req.file || !req.file.path) {
+        return res.status(400).json({ success: false, message: 'New image is required' });
+      }
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      //  Delete old image if exists
+      if (user.profileImage?.public_id) {
+        await cloudinary.uploader.destroy(user.profileImage.public_id);
+      }
+      // 🆕 Save new image
+      user.profileImage = {
+        url: req.file.path,
+        public_id: req.file.filename,
+      };
+      await user.save();
+      return res.status(200).json({
+        success: true,
+        message: 'Profile image updated successfully',
+        profileImage: user.profileImage,
+      });
+    } catch (error) {
+      console.error('Update Profile Image Error:', error);
+      return res.status(500).json({ success: false, message: 'Server error' });
+    }
+  };
+ //delete profile image
+  const deleteProfileImage = async (req, res) => {
+    try {
+      const userId = req.user;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      if (!user.profileImage?.public_id) {
+        return res.status(400).json({ success: false, message: 'No profile image to delete' });
+      }
+      // Delete from Cloudinary
+      await cloudinary.uploader.destroy(user.profileImage.public_id);
+      // Clear from DB
+      user.profileImage = { url: "", public_id: "" };
+      await user.save();
+      return res.status(200).json({
+        success: true,
+        message: "Profile image deleted successfully",
+      });
+    } catch (error) {
+      console.error('Delete Image Error:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  };
 //delete account
 const deleteAccount = async (req, res) => {
     try {
@@ -555,6 +642,9 @@ export {
     loginUser,
     deleteAccount,
     editUserProfile,
+    uploadProfileImage,
+    updateProfileImage,
+    deleteProfileImage,
     logout,
     getMyProfile,
     changePassword,

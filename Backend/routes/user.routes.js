@@ -1,10 +1,13 @@
 import { Router } from "express";
+import upload from '../middlewares/multer.js'
 import {
     registerUser,
     deleteAccount,
     loginUser,
     logout,
     editUserProfile,
+    updateProfileImage,
+    deleteProfileImage,
     addEmail,
     verifyEmailCode,
     cancelAddEmail,
@@ -14,12 +17,16 @@ import {
     verifyForgetPassword,
     cancelForgetPasword,
     getMyProfile,
+    uploadProfileImage
 } from "../controllers/user.controller.js";
 import isAuth from "../middlewares/auth.js";
 const router = Router()
 router.post('/register', registerUser)
 router.post('/login', loginUser)
 router.put('/edit-profile', isAuth, editUserProfile);
+router.post('/upload-profile', isAuth, upload.single('image'), uploadProfileImage)
+router.delete("/delete-profile", isAuth, deleteProfileImage);
+router.put("/update-profile-image", isAuth, upload.single("image"), updateProfileImage);
 router.delete("/delete", isAuth, deleteAccount);
 router.post('/add-email',isAuth,addEmail)
 router.get("/verify-email", isAuth,verifyEmailCode)
