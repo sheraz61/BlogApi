@@ -24,7 +24,7 @@ const registerUser = async (req, res) => {
             name,
             username,
             password: hashedPassword,
-            role:"user"
+            role: "user"
         });
         // Send response
         res.status(201).json({
@@ -63,6 +63,13 @@ const loginUser = async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({ message: "Invalid password", succss: false });
         }
+        // Save login history
+        user.loginHistory.push({
+            timestamp: new Date(),
+            ip: req.ip,
+            userAgent: req.headers["user-agent"],
+        });
+        await user.save();
         // Create JWT
         const token = await jwt.sign({ id: user._id }, process.env.jwt_Secret, {
             expiresIn: "1d",
@@ -97,115 +104,162 @@ const logout = async (req, res) => {
         res.status(500).json({ message: error.message, success: false });
     }
 }
+//add bio
+const addBio = async (req, res) => {
+    try {
+        const userId = req.user; // From isAuth middleware
+        const { bio } = req.body;
+        if (!bio || bio.trim().length === 0) {
+            return res.status(400).json({ success: false, message: "Bio is required" });
+        }
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        if (user.bio && user.bio !== "Write your bio here...") {
+            return res.status(400).json({ success: false, message: "Bio already exists. Use update instead." });
+        }
+        user.bio = bio;
+        await user.save();
+        res.status(200).json({
+            success: true,
+            message: "Bio added successfully",
+            bio: user.bio,
+        });
+    } catch (error) {
+        console.error("Add Bio Error:", error.message);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+//update bio
+const updateBio = async (req, res) => {
+    try {
+        const userId = req.user; // From isAuth middleware
+        const { bio } = req.body;
+        if (!bio || bio.trim().length === 0) {
+            return res.status(400).json({ success: false, message: "Bio is required" });
+        }
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        user.bio = bio;
+        await user.save();
+        res.status(200).json({
+            success: true,
+            message: "Bio updated successfully",
+            bio: user.bio,
+        });
+    } catch (error) {
+        console.error("Update Bio Error:", error.message);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
 //Upload profile image
 const uploadProfileImage = async (req, res) => {
     try {
-      const userId = req.user; // From isAuth middleware
-      if (!req.file || !req.file.path) {
-        return res.status(400).json({ success: false, message: 'Image is required' });
-      }
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-      }
-      // Delete previous image from Cloudinary if it exists
-      if (user.profileImage?.public_id) {
-        await cloudinary.uploader.destroy(user.profileImage.public_id);
-      }
-      // Save new image details
-      user.profileImage = {
-        url: req.file.path,
-        public_id: req.file.filename,
-      };
-      await user.save();
-      return res.status(200).json({
-        success: true,
-        message: "Profile image uploaded successfully",
-        profileImage: user.profileImage,
-      });
+        const userId = req.user; // From isAuth middleware
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ success: false, message: 'Image is required' });
+        }
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        // Delete previous image from Cloudinary if it exists
+        if (user.profileImage?.public_id) {
+            await cloudinary.uploader.destroy(user.profileImage.public_id);
+        }
+        // Save new image details
+        user.profileImage = {
+            url: req.file.path,
+            public_id: req.file.filename,
+        };
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Profile image uploaded successfully",
+            profileImage: user.profileImage,
+        });
     } catch (error) {
-      console.error('Upload Image Error:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+        console.error('Upload Image Error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
-  };
-  //update profile image
-  const updateProfileImage = async (req, res) => {
+};
+//update profile image
+const updateProfileImage = async (req, res) => {
     try {
-      const userId = req.user; // From isAuth middleware
-      if (!req.file || !req.file.path) {
-        return res.status(400).json({ success: false, message: 'New image is required' });
-      }
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-      }
-      //  Delete old image if exists
-      if (user.profileImage?.public_id) {
-        await cloudinary.uploader.destroy(user.profileImage.public_id);
-      }
-      // 🆕 Save new image
-      user.profileImage = {
-        url: req.file.path,
-        public_id: req.file.filename,
-      };
-      await user.save();
-      return res.status(200).json({
-        success: true,
-        message: 'Profile image updated successfully',
-        profileImage: user.profileImage,
-      });
+        const userId = req.user; // From isAuth middleware
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ success: false, message: 'New image is required' });
+        }
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        //  Delete old image if exists
+        if (user.profileImage?.public_id) {
+            await cloudinary.uploader.destroy(user.profileImage.public_id);
+        }
+        // 🆕 Save new image
+        user.profileImage = {
+            url: req.file.path,
+            public_id: req.file.filename,
+        };
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: 'Profile image updated successfully',
+            profileImage: user.profileImage,
+        });
     } catch (error) {
-      console.error('Update Profile Image Error:', error);
-      return res.status(500).json({ success: false, message: 'Server error' });
+        console.error('Update Profile Image Error:', error);
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
-  };
- //delete profile image
-  const deleteProfileImage = async (req, res) => {
+};
+//delete profile image
+const deleteProfileImage = async (req, res) => {
     try {
-      const userId = req.user;
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-      }
-      if (!user.profileImage?.public_id) {
-        return res.status(400).json({ success: false, message: 'No profile image to delete' });
-      }
-      // Delete from Cloudinary
-      await cloudinary.uploader.destroy(user.profileImage.public_id);
-      // Clear from DB
-      user.profileImage = { url: "", public_id: "" };
-      await user.save();
-      return res.status(200).json({
-        success: true,
-        message: "Profile image deleted successfully",
-      });
+        const userId = req.user;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        if (!user.profileImage?.public_id) {
+            return res.status(400).json({ success: false, message: 'No profile image to delete' });
+        }
+        // Delete from Cloudinary
+        await cloudinary.uploader.destroy(user.profileImage.public_id);
+        // Clear from DB
+        user.profileImage = { url: "", public_id: "" };
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Profile image deleted successfully",
+        });
     } catch (error) {
-      console.error('Delete Image Error:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+        console.error('Delete Image Error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
-  };
+};
 //delete account
 const deleteAccount = async (req, res) => {
     try {
-      const userId = req.user;
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found", success: false });
-      }
-      await User.findByIdAndDelete(userId);
-      res.status(200).json({
-        message: "Account deleted successfully",
-        success: true,
-      });
+        const userId = req.user;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found", success: false });
+        }
+        await User.findByIdAndDelete(userId);
+        res.status(200).json({
+            message: "Account deleted successfully",
+            success: true,
+        });
     } catch (err) {
-      res.status(500).json({ message: "Server error", success: false });
+        res.status(500).json({ message: "Server error", success: false });
     }
-  };
+};
 //get user profile
 const getMyProfile = async (req, res) => {
     try {
         const userId = req.user;
-        const user = await User.findById(userId).select('-password -resetPassword -emailVerification')
+        const user = await User.findById(userId).select('-password -__v -loginHistory -email -role -resetPassword -emailVerification')
         if (!user) {
             res.status(404).json({
                 message: "User not found",
@@ -223,48 +277,47 @@ const getMyProfile = async (req, res) => {
 }
 //edit profile details
 const editUserProfile = async (req, res) => {
-  try {
-    const userId = req.user; // You get this from auth middleware
-    const { username, name } = req.body;
+    try {
+        const userId = req.user; // You get this from auth middleware
+        const { username, name } = req.body;
 
-    if (!username && !name) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide username or name to update.",
-      });
+        if (!username && !name) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide username or name to update.",
+            });
+        }
+
+        const user = await User.findById(userId).select("-password -resetPassword -emailVerification");
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        if (username) user.username = username;
+        if (name) user.name = name;
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully.",
+            user: {
+                _id: user._id,
+                username: user.username,
+                name: user.name,
+            },
+        });
+    } catch (err) {
+        console.error("Profile Update Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Server error while updating profile.",
+        });
     }
-
-    const user = await User.findById(userId).select("-password -resetPassword -emailVerification");
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
-
-    if (username) user.username = username;
-    if (name) user.name = name;
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully.",
-      user: {
-        _id: user._id,
-        username: user.username,
-        name: user.name,
-      },
-    });
-  } catch (err) {
-    console.error("Profile Update Error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Server error while updating profile.",
-    });
-  }
 };
-
 //change password
 const changePassword = async (req, res) => {
     try {
@@ -416,6 +469,7 @@ const verifyEmailCode = async (req, res) => {
             return res.status(401).json({ message: "Incorrect code", success: false });
         }
         // Clear verification fields
+        user.isVerified = true
         user.email = user.unverifyEmail;
         user.emailVerification = undefined;
         user.unverifyEmail = undefined;
@@ -576,7 +630,6 @@ const forgetPassword = async (req, res) => {
         })
     }
 }
-
 const verifyForgetPassword = async (req, res) => {
     try {
         const { email, code, newPassword } = req.body;
@@ -617,23 +670,56 @@ const verifyForgetPassword = async (req, res) => {
         res.status(500).json({ message: "Server error", success: false });
     }
 };
-
 const cancelForgetPasword = async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required", success: false });
-      }
-      const user = await User.findOne({ email });
-      if (!user || !user.resetPassword) {
-        return res.status(404).json({ message: "No active password reset request found", success: false });
-      }
-      user.resetPassword = undefined;
-      await user.save();
-      return res.status(200).json({ message: "Password reset request cancelled", success: true });
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: "Email is required", success: false });
+        }
+        const user = await User.findOne({ email });
+        if (!user || !user.resetPassword) {
+            return res.status(404).json({ message: "No active password reset request found", success: false });
+        }
+        user.resetPassword = undefined;
+        await user.save();
+        return res.status(200).json({ message: "Password reset request cancelled", success: true });
     } catch (err) {
-      console.error("Cancel Reset Error:", err);
-      return res.status(500).json({ message: "Server error", success: false });
+        console.error("Cancel Reset Error:", err);
+        return res.status(500).json({ message: "Server error", success: false });
+    }
+};
+const getPublicProfile = async (req, res) => {
+    try {
+        const { username } = req.params;
+        const user = await User.findOne({ username })
+            .select('username name bio profileImage createdAt')
+            .lean();
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        // Optional: fetch user posts if needed
+        // const posts = await Post.find({ author: user._id }).select('title createdAt').limit(5);
+        res.status(200).json({
+            success: true,
+            user,
+            // posts
+        });
+    } catch (error) {
+        console.error("Public Profile Error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+const getLoginHistory = async (req, res) => {
+    try {
+      const userId = req.user; // from isAuth middleware
+      const user = await User.findById(userId).select("loginHistory");
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
+      res.status(200).json({
+        success: true,
+        loginHistory: user.loginHistory.reverse(), // most recent first
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
     }
   };
 
@@ -641,6 +727,8 @@ export {
     registerUser,
     loginUser,
     deleteAccount,
+    addBio,
+    updateBio,
     editUserProfile,
     uploadProfileImage,
     updateProfileImage,
@@ -654,5 +742,7 @@ export {
     addEmail,
     verifyEmailCode,
     changeEmail,
-    cancelAddEmail
+    cancelAddEmail,
+    getPublicProfile,
+    getLoginHistory
 }

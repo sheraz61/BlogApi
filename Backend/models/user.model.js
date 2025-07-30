@@ -24,6 +24,10 @@ const userSchema =  new mongoose.Schema({
         type:String,
         unique:true
     },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
     emailVerification: {
         code: String,
         expiresAt: Date,
@@ -41,7 +45,19 @@ const userSchema =  new mongoose.Schema({
       profileImage: {
         url: String,
         public_id: String,
-      }
+      },
+      bio: {
+        type: String,
+        default: 'Write your bio here...',
+        maxlength: 300, // optional limit
+      },
+      loginHistory: [
+        {
+          timestamp: Date,
+          ip: String,
+          userAgent: String,
+        },
+      ],
 })
 
 export const User=mongoose.model('User',userSchema)
