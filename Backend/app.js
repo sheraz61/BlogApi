@@ -30,5 +30,7 @@ app.get('/',(req,res)=>{
     res.send('Blog app runing at this port')
 })
 import userRoute from './routes/user.routes.js'
+import adminRoute from './routes/admin.routes.js'
 app.use('/api/v1/user',userRoute)
+app.use('/api/v1/admin',adminRoute)
 export {app}

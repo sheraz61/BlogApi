@@ -1,6 +1,10 @@
 import { Router } from "express";
 import {
-    createUser,
+    registerUser,
+    deleteAccount,
+    loginUser,
+    logout,
+    editUserProfile,
     addEmail,
     verifyEmailCode,
     cancelAddEmail,
@@ -8,21 +12,24 @@ import {
     changePassword,
     forgetPassword,
     verifyForgetPassword,
+    cancelForgetPasword,
     getMyProfile,
-    loginUser,
-    logout
 } from "../controllers/user.controller.js";
 import isAuth from "../middlewares/auth.js";
 const router = Router()
-router.post('/create', createUser)
+router.post('/register', registerUser)
 router.post('/login', loginUser)
-router.post('/add-email/:id',isAuth,addEmail)
-router.get("/verify-email/:id", isAuth,verifyEmailCode)
-router.post('/change-email/:id',isAuth,changeEmail)
-router.get("/cancel-email/:id", isAuth,cancelAddEmail)
+router.put('/edit-profile', isAuth, editUserProfile);
+router.delete("/delete", isAuth, deleteAccount);
+router.post('/add-email',isAuth,addEmail)
+router.get("/verify-email", isAuth,verifyEmailCode)
+router.post('/change-email',isAuth,changeEmail)
+router.get("/cancel-email", isAuth,cancelAddEmail)
 router.post('/logout', isAuth, logout)
-router.get('/profile/:id', isAuth, getMyProfile)
-router.post('/change-password/:id', isAuth, changePassword)
+router.get('/profile/', isAuth, getMyProfile)
+router.post('/change-password', isAuth, changePassword)
 router.post('/forget-password',forgetPassword)
 router.post('/verify-forget-password',verifyForgetPassword)
+router.post("/cancel-forget", cancelForgetPasword);
+
 export default router

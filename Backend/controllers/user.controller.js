@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import { sendEmail } from '../utils/sendEmail.js'
 
 //register user
-const createUser = async (req, res) => {
+const registerUser = async (req, res) => {
     try {
         const { name, username, password } = req.body;
         // Validation
@@ -24,6 +24,7 @@ const createUser = async (req, res) => {
             name,
             username,
             password: hashedPassword,
+            role:"user"
         });
         // Send response
         res.status(201).json({
@@ -47,7 +48,6 @@ const createUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { username, password } = req.body;
-
         // Validation
         if (!username || !password) {
             return res.status(400).json({ message: "All fields are required", succss: false });
@@ -58,18 +58,15 @@ const loginUser = async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: "Invalid username", succss: false });
         }
-
         // Compare password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: "Invalid password", succss: false });
         }
-
         // Create JWT
         const token = await jwt.sign({ id: user._id }, process.env.jwt_Secret, {
             expiresIn: "1d",
         });
-
         // Send response
         res.status(200).cookie('token', token, { expiresIn: "1d", httpOnly: true }).json({
             message: "Login Successfully",
@@ -100,11 +97,28 @@ const logout = async (req, res) => {
         res.status(500).json({ message: error.message, success: false });
     }
 }
+//delete account
+const deleteAccount = async (req, res) => {
+    try {
+      const userId = req.user;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found", success: false });
+      }
+      await User.findByIdAndDelete(userId);
+      res.status(200).json({
+        message: "Account deleted successfully",
+        success: true,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Server error", success: false });
+    }
+  };
 //get user profile
 const getMyProfile = async (req, res) => {
     try {
-        const userID = req.params.id;
-        const user = await User.findById(userID).select('-password')
+        const userId = req.user;
+        const user = await User.findById(userId).select('-password -resetPassword -emailVerification')
         if (!user) {
             res.status(404).json({
                 message: "User not found",
@@ -120,11 +134,55 @@ const getMyProfile = async (req, res) => {
         res.status(500).json({ message: error.message, success: false });
     }
 }
+//edit profile details
+const editUserProfile = async (req, res) => {
+  try {
+    const userId = req.user; // You get this from auth middleware
+    const { username, name } = req.body;
+
+    if (!username && !name) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide username or name to update.",
+      });
+    }
+
+    const user = await User.findById(userId).select("-password -resetPassword -emailVerification");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (username) user.username = username;
+    if (name) user.name = name;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        _id: user._id,
+        username: user.username,
+        name: user.name,
+      },
+    });
+  } catch (err) {
+    console.error("Profile Update Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating profile.",
+    });
+  }
+};
+
 //change password
 const changePassword = async (req, res) => {
     try {
         const { newPassword } = req.body;
-        const userId = req.params.id;
+        const userId = req.user;
         if (!newPassword) {
             return res.status(401).json({
                 message: "New password required",
@@ -154,7 +212,7 @@ const changePassword = async (req, res) => {
 //add email
 const addEmail = async (req, res) => {
     try {
-        const userId = req.params.id;
+        const userId = req.user;
         const { email } = req.body;
         if (!email) {
             return res.status(401).json({
@@ -230,7 +288,7 @@ const addEmail = async (req, res) => {
 }
 const cancelAddEmail = async (req, res) => {
     try {
-        const userId = req.params.id;
+        const userId = req.user;
         const user = await User.findById(userId)
         if (!user) {
             return res.status(404).json({
@@ -255,7 +313,7 @@ const cancelAddEmail = async (req, res) => {
 //verify email
 const verifyEmailCode = async (req, res) => {
     try {
-        const userId = req.params.id;
+        const userId = req.user;
         const { code } = req.body;
         const user = await User.findById(userId);
         if (!user || !user.emailVerification) {
@@ -296,7 +354,7 @@ const verifyEmailCode = async (req, res) => {
 const changeEmail = async (req, res) => {
     try {
         const { newEmail } = req.body;
-        const userId = req.params.id;
+        const userId = req.user;
         if (!newEmail) {
             return res.status(401).json({
                 message: "New email required",
@@ -473,4 +531,38 @@ const verifyForgetPassword = async (req, res) => {
     }
 };
 
-export { createUser, loginUser, logout, getMyProfile, changePassword, forgetPassword, verifyForgetPassword, addEmail, verifyEmailCode, changeEmail, cancelAddEmail }
+const cancelForgetPasword = async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required", success: false });
+      }
+      const user = await User.findOne({ email });
+      if (!user || !user.resetPassword) {
+        return res.status(404).json({ message: "No active password reset request found", success: false });
+      }
+      user.resetPassword = undefined;
+      await user.save();
+      return res.status(200).json({ message: "Password reset request cancelled", success: true });
+    } catch (err) {
+      console.error("Cancel Reset Error:", err);
+      return res.status(500).json({ message: "Server error", success: false });
+    }
+  };
+
+export {
+    registerUser,
+    loginUser,
+    deleteAccount,
+    editUserProfile,
+    logout,
+    getMyProfile,
+    changePassword,
+    forgetPassword,
+    cancelForgetPasword,
+    verifyForgetPassword,
+    addEmail,
+    verifyEmailCode,
+    changeEmail,
+    cancelAddEmail
+}
