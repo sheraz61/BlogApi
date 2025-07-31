@@ -31,6 +31,8 @@ app.get('/',(req,res)=>{
 })
 import userRoute from './routes/user.routes.js'
 import adminRoute from './routes/admin.routes.js'
+import postroute from './routes/post.routes.js'
 app.use('/api/v1/user',userRoute)
 app.use('/api/v1/admin',adminRoute)
+app.use('/api/v1/post',postroute)
 export {app}
