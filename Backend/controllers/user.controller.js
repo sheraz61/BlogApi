@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { Post } from "../models/post.model.js";
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { sendEmail } from '../utils/sendEmail.js'
@@ -257,24 +258,33 @@ const deleteAccount = async (req, res) => {
 };
 //get user profile
 const getMyProfile = async (req, res) => {
-    try {
-        const userId = req.user;
-        const user = await User.findById(userId).select('-password -__v -loginHistory -email -role -resetPassword -emailVerification')
-        if (!user) {
-            res.status(404).json({
-                message: "User not found",
-                success: false
-            })
-        }
-        return res.status(200).json({
-            message: "User Fetch Successfully",
-            success: true,
-            user
-        })
-    } catch (error) {
-        res.status(500).json({ message: error.message, success: false });
+  try {
+    const userId = req.user;
+    // Get user info
+    const user = await User.findById(userId).select(
+      '-password -likes -bookmarks -isVerified -role  -__v  -loginHistory -resetPassword -emailVerification'
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found',
+        success: false,
+      });
     }
-}
+    // Get posts authored by this user
+    const posts = await Post.find({ 'author._id': userId }).sort({ createdAt: -1 }).select('-author');
+    return res.status(200).json({
+      message: 'User fetched successfully',
+      success: true,
+      user,
+      posts,
+    });
+  } catch (error) {
+    console.error('Get Profile Error:', error.message);
+    res.status(500).json({ message: 'Server error', success: false });
+  }
+};
+
 //edit profile details
 const editUserProfile = async (req, res) => {
     try {
