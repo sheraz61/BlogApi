@@ -1,5 +1,6 @@
 import { Router } from "express";
 import upload from '../middlewares/multer.js'
+import { setUploadTarget } from "../middlewares/setUploadTraget.js";
 import {
     registerUser,
     deleteAccount,
@@ -30,9 +31,9 @@ router.post('/login', loginUser)
 router.put('/edit-profile', isAuth, editUserProfile);
 router.post("/bio", isAuth, addBio);
 router.put("/bio", isAuth, updateBio);
-router.post('/upload-profile', isAuth, upload.single('image'), uploadProfileImage)
+router.post('/upload-profile', isAuth,setUploadTarget('profile'), upload.single('image'), uploadProfileImage)
 router.delete("/delete-profile", isAuth, deleteProfileImage);
-router.put("/update-profile-image", isAuth, upload.single("image"), updateProfileImage);
+router.put("/update-profile-image", isAuth, setUploadTarget('profile'), upload.single("image"), updateProfileImage);
 router.delete("/delete", isAuth, deleteAccount);
 router.post('/add-email', isAuth, addEmail)
 router.get("/verify-email", isAuth, verifyEmailCode)
