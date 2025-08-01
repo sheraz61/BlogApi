@@ -1,6 +1,6 @@
 # BlogApi - Full Stack Blog Application
 
-A modern blog application built with Node.js, Express, MongoDB, and React. This project features a robust backend API with user authentication, profile management, email verification, and admin functionality.
+A modern blog application built with Node.js, Express, MongoDB, and React. This project features a comprehensive backend API with user authentication, blog post management, social features, and advanced admin functionality.
 
 ## 🚀 Features
 
@@ -9,6 +9,8 @@ A modern blog application built with Node.js, Express, MongoDB, and React. This 
 - **User Login/Logout** - JWT-based authentication with secure cookie handling
 - **Profile Management** - Edit user profiles and manage personal information
 - **Account Deletion** - Secure account deletion functionality
+- **Login History** - Track user login activities
+- **Public Profiles** - View other users' public profiles
 
 ### Profile Image Management
 - **Upload Profile Image** - Upload and update profile pictures using Cloudinary
@@ -27,8 +29,25 @@ A modern blog application built with Node.js, Express, MongoDB, and React. This 
 - **Password Reset Verification** - OTP-based password reset verification
 - **Reset Cancellation** - Cancel pending password reset processes
 
+### Blog Post Management
+- **Create Posts** - Create blog posts with text content and images
+- **Update Posts** - Edit existing blog posts
+- **Delete Posts** - Remove blog posts with proper cleanup
+- **View Posts** - Get all posts or specific post by ID
+- **Image Upload** - Upload images for blog posts using Cloudinary
+
+### Social Features
+- **Like System** - Like and unlike blog posts
+- **Comment System** - Add, edit, and delete comments on posts
+- **Bookmark System** - Save posts to personal bookmarks
+- **View Comments** - Get all comments for a specific post
+
 ### Admin Features
 - **Admin Dashboard** - Overview of users, verified users, and posts
+- **User Management** - View all users, verified users, and user details
+- **Post Management** - View all posts and manage content
+- **User Deletion** - Delete users by admin
+- **Post Deletion** - Delete any post by admin
 - **Admin Authentication** - Role-based access control for admin functions
 
 ### Security Features
@@ -37,6 +56,7 @@ A modern blog application built with Node.js, Express, MongoDB, and React. This 
 - **CORS Configuration** - Cross-origin resource sharing setup
 - **Input Validation** - Request validation and sanitization
 - **Rate Limiting** - Protection against brute force attacks
+- **Role-based Access** - Admin and user role management
 
 ## 🛠️ Tech Stack
 
@@ -51,6 +71,7 @@ A modern blog application built with Node.js, Express, MongoDB, and React. This 
 - **Cloudinary** - Cloud image storage
 - **Nodemailer** - Email sending functionality
 - **CORS** - Cross-origin resource sharing
+- **Cookie Parser** - Cookie handling
 
 ### Development Tools
 - **Nodemon** - Development server with auto-restart
@@ -68,18 +89,29 @@ BlogApi/
 │   │   └── cloudinary.js      # Cloudinary configuration
 │   ├── controllers/
 │   │   ├── user.controller.js # User-related operations
-│   │   └── admin.controller.js # Admin operations
+│   │   ├── admin.controller.js # Admin operations
+│   │   ├── post.controller.js  # Blog post operations
+│   │   ├── comment.controller.js # Comment operations
+│   │   ├── like.controller.js  # Like operations
+│   │   └── bookmark.controller.js # Bookmark operations
 │   ├── db/
 │   │   └── index.js           # Database connection
 │   ├── middlewares/
 │   │   ├── auth.js            # JWT authentication middleware
 │   │   ├── isAdmin.js         # Admin role verification
-│   │   └── multer.js          # File upload middleware
+│   │   ├── multer.js          # File upload middleware
+│   │   └── setUploadTraget.js # Upload target configuration
 │   ├── models/
-│   │   └── user.model.js      # User data model
+│   │   ├── user.model.js      # User data model
+│   │   ├── post.model.js      # Post data model
+│   │   └── comment.model.js   # Comment data model
 │   ├── routes/
 │   │   ├── user.routes.js     # User API endpoints
-│   │   └── admin.routes.js    # Admin API endpoints
+│   │   ├── admin.routes.js    # Admin API endpoints
+│   │   ├── post.routes.js     # Post API endpoints
+│   │   ├── comment.routes.js  # Comment API endpoints
+│   │   ├── like.routes.js     # Like API endpoints
+│   │   └── bookmark.routes.js # Bookmark API endpoints
 │   └── utils/
 │       └── sendEmail.js       # Email utility functions
 └── Frontend/                  # React frontend (in development)
@@ -143,6 +175,12 @@ The server will start on `http://localhost:9000`
 - `PUT /update-profile-image` - Update profile image
 - `DELETE /delete-profile` - Delete profile image
 - `DELETE /delete` - Delete user account
+- `GET /profile/:username` - Get public profile
+- `GET /login-history` - Get login history
+
+#### Bio Management
+- `POST /bio` - Add user bio
+- `PUT /bio` - Update user bio
 
 #### Email Management
 - `POST /add-email` - Add email to account
@@ -156,8 +194,35 @@ The server will start on `http://localhost:9000`
 - `POST /verify-forget-password` - Verify password reset
 - `POST /cancel-forget` - Cancel password reset
 
+### Post Routes (`/api/v1/post`)
+- `GET /` - Get all posts
+- `GET /:id` - Get specific post
+- `POST /create` - Create new post
+- `PUT /update/:id` - Update post
+- `DELETE /del/:id` - Delete post
+
+### Comment Routes (`/api/v1/comment`)
+- `POST /:id` - Create comment on post
+- `GET /:id` - Get comments for post
+- `PUT /:id` - Edit comment
+- `DELETE /:id` - Delete comment
+
+### Like Routes (`/api/v1/like`)
+- `POST /:id` - Toggle like on post
+
+### Bookmark Routes (`/api/v1/bookmark`)
+- `POST /:id` - Toggle bookmark on post
+- `GET /` - Get bookmarked posts
+
 ### Admin Routes (`/api/v1/admin`)
 - `GET /dashboard` - Admin dashboard statistics
+- `GET /users` - Get all users
+- `GET /users/verified` - Get verified users
+- `GET /user/:id` - Get user details
+- `DELETE /user/:id` - Delete user
+- `GET /posts` - Get all post titles
+- `GET /posts/:id` - Get post details
+- `DELETE /post/:id` - Delete post
 
 ## 🔐 Authentication
 
@@ -178,11 +243,12 @@ The application includes comprehensive email functionality:
 
 ## 🖼️ Image Upload
 
-Profile images are stored using Cloudinary:
+Images are stored using Cloudinary:
 - Automatic image optimization
 - Secure cloud storage
 - Public ID tracking for cleanup
 - Support for multiple image formats
+- Separate storage for profile and post images
 
 ## 🔒 Security Features
 
@@ -192,32 +258,37 @@ Profile images are stored using Cloudinary:
 - **CORS Protection**: Configured cross-origin requests
 - **Rate Limiting**: Protection against abuse
 - **Secure Cookies**: HTTP-only cookies for token storage
+- **Role-based Access**: Admin and user permissions
 
 ## 🚧 Development Status
 
 ### ✅ Completed Features
-- User authentication system
-- Profile management
-- Email verification system
-- Password reset functionality
-- Image upload and management
-- Admin dashboard structure
-- Database models and schemas
-- API route structure
+- **Backend API (100% Complete)**
+  - User authentication system
+  - Profile management with image upload
+  - Email verification system
+  - Password reset functionality
+  - Blog post CRUD operations
+  - Comment system
+  - Like system
+  - Bookmark system
+  - Admin dashboard and management
+  - Database models and schemas
+  - Complete API route structure
+  - Security implementations
 
 ### 🚧 In Progress
 - Frontend development
-- Blog post functionality
-- Advanced admin features
-- User roles and permissions
+- UI/UX design
+- Real-time features
 
 ### 📋 Planned Features
-- Blog post creation and management
-- Comment system
+- Real-time notifications
 - User following system
 - Advanced search functionality
-- Real-time notifications
 - Mobile app development
+- Analytics dashboard
+- Content moderation tools
 
 ## 🤝 Contributing
 
@@ -241,4 +312,4 @@ For support and questions, please contact the development team or create an issu
 
 ---
 
-**Note**: This is a work in progress. The frontend is currently under development, and additional features are being added regularly.
+**Note**: The backend API is now complete with all core features implemented. The frontend is currently under development.
