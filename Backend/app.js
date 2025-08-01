@@ -34,9 +34,12 @@ import adminRoute from './routes/admin.routes.js'
 import postroute from './routes/post.routes.js'
 import bookmarkroute from './routes/bookmark.routes.js'
 import likeroute from './routes/like.routes.js'
+import commentroute from './routes/comment.routes.js'
 app.use('/api/v1/user',userRoute)
 app.use('/api/v1/admin',adminRoute)
 app.use('/api/v1/post',postroute)
 app.use('/api/v1/bookmark',bookmarkroute)
 app.use('/api/v1/like',likeroute)
+app.use('/api/v1/comment',commentroute)
+
 export {app}
