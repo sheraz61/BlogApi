@@ -19,9 +19,13 @@ const postSchema = new mongoose.Schema({
         public_id: String
     },
     author: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+        _id: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+        }, username: {
+            type: String,
+            required: true,
+        },
     }
 }, { timestamps: true });
 
