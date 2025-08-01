@@ -26,7 +26,18 @@ const postSchema = new mongoose.Schema({
             type: String,
             required: true,
         },
-    }
+    },
+     bookmarks: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Post'
+        }
+      ], likes: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Post',
+        },
+      ],
 }, { timestamps: true });
 
 export const Post = mongoose.model('Post', postSchema);

@@ -11,18 +11,16 @@ export const toggleBookmark = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    if(!post){
+    if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
-    const isBookmarked = user.bookmarks.includes(postId);
-    if (isBookmarked) {
-      user.bookmarks = user.bookmarks.filter(id => id.toString() !== postId);
-      await user.save();
+    if (user.bookmarks.includes(postId) && post.bookmarks.includes(userId)) {
+      await User.findByIdAndUpdate(userId, { $pull: { bookmarks: postId } })
+      await Post.findByIdAndUpdate(postId, { $pull: { bookmarks: userId } })
       return res.status(200).json({ success: true, message: 'Bookmark removed successfully' });
     } else {
-      user.bookmarks = user.bookmarks || [];
-      user.bookmarks.push(postId);
-      await user.save();
+      await User.findByIdAndUpdate(userId, { $push: { bookmarks: postId } })
+      await Post.findByIdAndUpdate(postId, { $push: { bookmarks: userId } })
       return res.status(200).json({ success: true, message: 'Post bookmarked successfully' });
     }
   } catch (error) {
@@ -41,10 +39,10 @@ export const getBookmarkedPosts = async (req, res) => {
     });
 
     return res.status(200).json({
-        message:"Bookmark Post Fetch Successfully",
-        success: true, 
-        bookmarks: user.bookmarks
-     });
+      message: "Bookmark Post Fetch Successfully",
+      success: true,
+      bookmarks: user.bookmarks
+    });
   } catch (error) {
     console.error('Get Bookmarks Error:', error.message);
     return res.status(500).json({ success: false, message: 'Server Error' });

@@ -5,7 +5,7 @@ export const createPost = async (req, res) => {
   try {
     const { title, content, category } = req.body;
     const userId = req.user; // from auth middleware
-    const user=await User.findById(userId).select('-name -password -isVerified -role -bio -__v -email -loginHistory -resetPassword -emailVerification')
+    const user=await User.findById(userId).select('-name -password -likes -bookmarks -isVerified -role -bio -__v -email -loginHistory -resetPassword -emailVerification')
     if (!title || !content || !category) {
       return res.status(400).json({ message: "All fields are required", success: false });
     }
